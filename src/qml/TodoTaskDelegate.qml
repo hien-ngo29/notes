@@ -78,6 +78,16 @@ MouseArea {
         }
     }
 
+    onReleased: {
+        onReleasedTask();
+    }
+
+    /* If you are doing changes to this function, remember to update your functon content to onReleased signal of MouseArea of taskTextNonEditable, there's a note describing the problem. */
+    function onReleasedTask () {
+        taskDragArea.moveTaskBeforeDeletion();
+        cursorShape = Qt.OpenHandCursor
+    }
+
     FontIconLoader {
         id: fontIconLoader
     }
@@ -363,14 +373,6 @@ MouseArea {
         }
     }
 
-    function onReleasedTask () {
-        taskDragArea.moveTaskBeforeDeletion();
-    }
-
-    onReleased: {
-        onReleasedTask();
-    }
-
     Rectangle {
         id: taskContent
         radius: 5
@@ -610,7 +612,14 @@ MouseArea {
                     hoverEnabled: true
 
                     onReleased: {
-                        taskDragArea.onReleasedTask();
+                        /* This code should have been replaced with taskDragArea.onReleaseTask(). However, if we use that function,
+                        the cursor shape won't switch back to Qt.OpenHandCursor. Idk why does this happen */
+
+                        // TODO: Find a way to replace this code into taskDragArea.onRelease() without cursorShape problem as I mentioned above.
+
+                        taskDragArea.moveTaskBeforeDeletion();
+                        cursorShape = Qt.OpenHandCursor
+                        //
                     }
 
                     onPressAndHold: {
