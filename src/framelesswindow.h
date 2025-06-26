@@ -19,7 +19,7 @@ class CFramelessWindow : public QMainWindow
 {
     Q_OBJECT
 public:
-    explicit CFramelessWindow(QWidget *parent = 0);
+    explicit CFramelessWindow(QWidget *parent = nullptr);
 
 public:
     // 设置是否可以通过鼠标调整窗口大小
@@ -44,11 +44,7 @@ protected:
     //  this by add "label1" to a ignorelist, just call addIgnoreWidget(label1)
     void addIgnoreWidget(QWidget *widget);
 
-#    if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result);
-#    else
-    bool nativeEvent(const QByteArray &eventType, void *message, long *result);
-#    endif
 private slots:
     void onTitleBarDestroyed();
 
@@ -81,7 +77,7 @@ class CFramelessWindow : public QMainWindow
 {
     Q_OBJECT
 public:
-    explicit CFramelessWindow(QWidget *parent = 0);
+    explicit CFramelessWindow(QWidget *parent = nullptr);
 
 private:
     void initUI();

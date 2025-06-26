@@ -7,7 +7,7 @@
 #include "updaterwindow.h"
 #include "ui_updaterwindow.h"
 
-#include <math.h>
+#include <cmath>
 
 #include <QTimer>
 #include <QMessageBox>
@@ -35,8 +35,7 @@ static QProcess XDGOPEN_PROCESS;
 /**
  * Indicates from where we should download the update definitions file
  */
-static const QString
-        UPDATES_URL("https://raw.githubusercontent.com/nuttyartist/notes/master/UPDATES_FOSS.json");
+static const QString UPDATES_URL("https://raw.githubusercontent.com/nuttyartist/notes/master/UPDATES_FOSS.json");
 
 /**
  * Initializes the window components and configures the QSimpleUpdater
@@ -62,19 +61,13 @@ UpdaterWindow::UpdaterWindow(QWidget *parent)
 
     /* Initialize the UI */
     m_ui->setupUi(this);
-#if QT_VERSION < QT_VERSION_CHECK(5, 10, 0)
-    setWindowFlag(Qt::WindowContextHelpButtonHint, false);
-#endif
     setWindowTitle(qApp->applicationName() + " " + tr("Updater"));
 
     /* Change fonts */
 #ifdef __APPLE__
-    QFont fontToUse = QFont(QStringLiteral("SF Pro Text")).exactMatch()
-            ? QStringLiteral("SF Pro Text")
-            : QStringLiteral("Roboto");
+    QFont fontToUse = QFont(QStringLiteral("SF Pro Text")).exactMatch() ? QStringLiteral("SF Pro Text") : QStringLiteral("Roboto");
 #elif _WIN32
-    QFont fontToUse = QFont(QStringLiteral("Segoe UI")).exactMatch() ? QStringLiteral("Segoe UI")
-                                                                     : QStringLiteral("Roboto");
+    QFont fontToUse = QFont(QStringLiteral("Segoe UI")).exactMatch() ? QStringLiteral("Segoe UI") : QStringLiteral("Roboto");
 #else
     QFont fontToUse = QFont(QStringLiteral("Roboto"));
 #endif
@@ -88,8 +81,7 @@ UpdaterWindow::UpdaterWindow(QWidget *parent)
 
     /* Connect UI signals/slots */
     connect(m_ui->closeButton, &QPushButton::clicked, this, &UpdaterWindow::close);
-    connect(m_ui->updateButton, &QPushButton::clicked, this,
-            &UpdaterWindow::onDownloadButtonClicked);
+    connect(m_ui->updateButton, &QPushButton::clicked, this, &UpdaterWindow::onDownloadButtonClicked);
     connect(m_updater, &QSimpleUpdater::checkingFinished, this, &UpdaterWindow::onCheckFinished);
     connect(m_ui->checkBox, &QCheckBox::toggled, this, &UpdaterWindow::dontShowUpdateWindowChanged);
 
@@ -202,9 +194,8 @@ void UpdaterWindow::resetControls()
     if (m_ui->changelog->toPlainText().isEmpty()) {
         m_ui->changelog->setText("<p>No changelog found...</p>");
     } else {
-        m_ui->changelog->setText(changelogText.append(
-                "\n")); // Don't know why currently changelog box is disappearing at the bottom, so
-                        // I add a new line to see the text.
+        m_ui->changelog->setText(changelogText.append("\n")); // Don't know why currently changelog box is disappearing at the bottom, so
+                                                              // I add a new line to see the text.
     }
 
     /* Enable/disable update button */
@@ -290,16 +281,13 @@ void UpdaterWindow::startDownload(const QUrl &url)
     m_startTime = QDateTime::currentDateTime().toSecsSinceEpoch();
     QNetworkRequest netReq(url);
 
-    netReq.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
-                        QNetworkRequest::NoLessSafeRedirectPolicy);
+    netReq.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
     m_reply = m_manager->get(netReq);
 
     /* Set file name */
     m_fileName = m_updater->getDownloadUrl(UPDATES_URL).split("/").last();
     if (m_fileName.isEmpty()) {
-        m_fileName = QString("%1_Update_%2.bin")
-                             .arg(QCoreApplication::applicationName(),
-                                  m_updater->getLatestVersion(UPDATES_URL));
+        m_fileName = QStringLiteral("%1_Update_%2.bin").arg(QCoreApplication::applicationName(), m_updater->getLatestVersion(UPDATES_URL));
     }
 
     /* Prepare download directory */
@@ -412,8 +400,8 @@ void UpdaterWindow::openDownloadFolder(const QString &file)
                              QMessageBox::Ok);
 
     /* Get the full path list of the downloaded file */
-    QString native_path = QDir::toNativeSeparators(QDir(file).absolutePath());
-    QStringList directories = native_path.split(QDir::separator());
+    QString nativePath = QDir::toNativeSeparators(QDir(file).absolutePath());
+    QStringList directories = nativePath.split(QDir::separator());
 
     /* Remove file name from list to get the folder of the update file */
     directories.removeLast();
@@ -453,8 +441,7 @@ void UpdaterWindow::calculateSizes(qint64 received, qint64 total)
     }
 
     /* Update the label text */
-    m_ui->downloadLabel->setText(tr("Downloading updates") + " (" + receivedSize + " " + tr("of")
-                                 + " " + totalSize + ")");
+    m_ui->downloadLabel->setText(tr("Downloading updates") + " (" + receivedSize + " " + tr("of") + " " + totalSize + ")");
 }
 
 /**
@@ -513,7 +500,7 @@ void UpdaterWindow::calculateTimeRemaining(qint64 received, qint64 total)
             } else {
                 timeString = tr("1 minute");
             }
-        } else if (timeRemaining <= 60) {
+        } else { // timeRemaining <= 60
             int seconds = int(timeRemaining + 0.5);
 
             if (seconds > 1) {
@@ -529,8 +516,7 @@ void UpdaterWindow::calculateTimeRemaining(qint64 received, qint64 total)
 
 void UpdaterWindow::onDownloadFinished()
 {
-    QString redirectedUrl =
-            m_reply->attribute(QNetworkRequest::RedirectionTargetAttribute).toString();
+    QString redirectedUrl = m_reply->attribute(QNetworkRequest::RedirectionTargetAttribute).toString();
 
     if (redirectedUrl.isEmpty()) {
         const QString filePath = m_downloadDir.filePath(m_fileName);
@@ -554,15 +540,11 @@ void UpdaterWindow::onDownloadFinished()
 void UpdaterWindow::mousePressEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton) {
-        if (event->x() < width() - 5 && event->x() > 5 && event->pos().y() < height() - 5
-            && event->pos().y() > 5) {
-#if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
+        if (event->position().x() < width() - 5 && event->position().x() > 5 && event->position().toPoint().y() < height() - 5
+            && event->position().toPoint().y() > 5) {
             m_canMoveWindow = !window()->windowHandle()->startSystemMove();
-#else
-            m_canMoveWindow = true;
-#endif
-            m_mousePressX = event->pos().x();
-            m_mousePressY = event->pos().y();
+            m_mousePressX = event->position().toPoint().x();
+            m_mousePressY = event->position().toPoint().y();
         }
     }
     event->accept();
@@ -576,8 +558,8 @@ void UpdaterWindow::mousePressEvent(QMouseEvent *event)
 void UpdaterWindow::mouseMoveEvent(QMouseEvent *event)
 {
     if (m_canMoveWindow) {
-        int dx = event->globalX() - m_mousePressX;
-        int dy = event->globalY() - m_mousePressY;
+        int dx = event->globalPosition().x() - m_mousePressX;
+        int dy = event->globalPosition().y() - m_mousePressY;
         move(dx, dy);
     }
 }

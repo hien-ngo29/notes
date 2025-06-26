@@ -16,12 +16,7 @@
                                        // external symbol __imp__DwmExtendFrameIntoClientArea
 #    pragma comment(lib, "user32.lib")
 
-CFramelessWindow::CFramelessWindow(QWidget *parent)
-    : QMainWindow(parent),
-      m_titlebar(Q_NULLPTR),
-      m_borderWidth(5),
-      m_bJustMaximized(false),
-      m_bResizeable(true)
+CFramelessWindow::CFramelessWindow(QWidget *parent) : QMainWindow(parent), m_titlebar(Q_NULLPTR), m_borderWidth(5), m_bJustMaximized(false), m_bResizeable(true)
 {
     //    setWindowFlag(Qt::Window,true);
     //    setWindowFlag(Qt::FramelessWindowHint, true);
@@ -97,19 +92,11 @@ void CFramelessWindow::addIgnoreWidget(QWidget *widget)
     m_whiteList.append(widget);
 }
 
-#    if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 bool CFramelessWindow::nativeEvent(const QByteArray &eventType, void *message, qintptr *result)
-#    else
-bool CFramelessWindow::nativeEvent(const QByteArray &eventType, void *message, long *result)
-#    endif
 {
-// Workaround for known bug -> check Qt forum :
-// https://forum.qt.io/topic/93141/qtablewidget-itemselectionchanged/13
-#    if (QT_VERSION == QT_VERSION_CHECK(5, 11, 1))
-    MSG *msg = *reinterpret_cast<MSG **>(message);
-#    else
+    // Workaround for known bug -> check Qt forum :
+    // https://forum.qt.io/topic/93141/qtablewidget-itemselectionchanged/13
     MSG *msg = reinterpret_cast<MSG *>(message);
-#    endif
 
     switch (msg->message) {
     case WM_NCCALCSIZE: {
@@ -158,23 +145,19 @@ bool CFramelessWindow::nativeEvent(const QByteArray &eventType, void *message, l
             }
             if (resizeWidth && resizeHeight) {
                 // bottom left corner
-                if (x >= winrect.left && x < winrect.left + border_width && y < winrect.bottom
-                    && y >= winrect.bottom - border_width) {
+                if (x >= winrect.left && x < winrect.left + border_width && y < winrect.bottom && y >= winrect.bottom - border_width) {
                     *result = HTBOTTOMLEFT;
                 }
                 // bottom right corner
-                if (x < winrect.right && x >= winrect.right - border_width && y < winrect.bottom
-                    && y >= winrect.bottom - border_width) {
+                if (x < winrect.right && x >= winrect.right - border_width && y < winrect.bottom && y >= winrect.bottom - border_width) {
                     *result = HTBOTTOMRIGHT;
                 }
                 // top left corner
-                if (x >= winrect.left && x < winrect.left + border_width && y >= winrect.top
-                    && y < winrect.top + border_width) {
+                if (x >= winrect.left && x < winrect.left + border_width && y >= winrect.top && y < winrect.top + border_width) {
                     *result = HTTOPLEFT;
                 }
                 // top right corner
-                if (x < winrect.right && x >= winrect.right - border_width && y >= winrect.top
-                    && y < winrect.top + border_width) {
+                if (x < winrect.right && x >= winrect.right - border_width && y >= winrect.top && y < winrect.top + border_width) {
                     *result = HTTOPRIGHT;
                 }
             }
@@ -218,9 +201,8 @@ bool CFramelessWindow::nativeEvent(const QByteArray &eventType, void *message, l
             m_frames.setRight(abs(frame.right) / dpr + 0.5);
             m_frames.setBottom(abs(frame.bottom) / dpr + 0.5);
 
-            QMainWindow::setContentsMargins(
-                    m_frames.left() + m_margins.left(), m_frames.top() + m_margins.top(),
-                    m_frames.right() + m_margins.right(), m_frames.bottom() + m_margins.bottom());
+            QMainWindow::setContentsMargins(m_frames.left() + m_margins.left(), m_frames.top() + m_margins.top(), m_frames.right() + m_margins.right(),
+                                            m_frames.bottom() + m_margins.bottom());
             m_bJustMaximized = true;
         } else {
             if (m_bJustMaximized) {
@@ -243,8 +225,7 @@ void CFramelessWindow::setContentsMargins(const QMargins &margins)
 }
 void CFramelessWindow::setContentsMargins(int left, int top, int right, int bottom)
 {
-    QMainWindow::setContentsMargins(left + m_frames.left(), top + m_frames.top(),
-                                    right + m_frames.right(), bottom + m_frames.bottom());
+    QMainWindow::setContentsMargins(left + m_frames.left(), top + m_frames.top(), right + m_frames.right(), bottom + m_frames.bottom());
     m_margins.setLeft(left);
     m_margins.setTop(top);
     m_margins.setRight(right);

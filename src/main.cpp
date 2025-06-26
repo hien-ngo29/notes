@@ -13,15 +13,11 @@ int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
     // Set application information
-    app.setApplicationName("Notes");
-    app.setApplicationVersion(APP_VERSION);
+    QApplication::setApplicationName("Notes");
+    QApplication::setApplicationVersion(APP_VERSION);
 
 #if defined(Q_OS_UNIX) && !defined(Q_OS_MACOS)
-    app.setDesktopFileName(APP_ID);
-#endif
-
-#if QT_VERSION >= QT_VERSION_CHECK(5, 10, 0) && QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
-    app.setAttribute(Qt::AA_DisableWindowContextHelpButton);
+    QApplication::setDesktopFileName(APP_ID);
 #endif
 
     if (QFontDatabase::addApplicationFont(":/fonts/fontawesome/fa-solid-900.ttf") < 0)
@@ -90,7 +86,7 @@ int main(int argc, char *argv[])
     // Prevent many instances of the app to be launched
     QString name = "com.awsomeness.notes";
     SingleInstance instance;
-    if (instance.hasPrevious(name)) {
+    if (SingleInstance::hasPrevious(name)) {
         return EXIT_SUCCESS;
     }
 
@@ -101,8 +97,7 @@ int main(int argc, char *argv[])
     w.show();
 
     // Bring the Notes window to the front
-    QObject::connect(&instance, &SingleInstance::newInstance, &w,
-                     [&]() { (&w)->setMainWindowVisibility(true); });
+    QObject::connect(&instance, &SingleInstance::newInstance, &w, [&]() { (&w)->setMainWindowVisibility(true); });
 
-    return app.exec();
+    return QApplication::exec();
 }

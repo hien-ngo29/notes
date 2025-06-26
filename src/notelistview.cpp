@@ -32,7 +32,7 @@ NoteListView::NoteListView(QWidget *parent)
       m_rowHeight(38),
       m_tagPool(nullptr),
       m_dbManager(nullptr),
-      m_currentFolderId{ SpecialNodeID::InvalidNodeId },
+      m_currentFolderId{ INVALID_NODE_ID },
       m_isInTrash{ false },
       m_isDragging{ false },
       m_isDraggingPinnedNotes{ false },
@@ -53,31 +53,31 @@ NoteListView::NoteListView(QWidget *parent)
     QTimer::singleShot(0, this, SLOT(init()));
     setContextMenuPolicy(Qt::CustomContextMenu);
     connect(this, &QWidget::customContextMenuRequested, this, &NoteListView::onCustomContextMenu);
-    contextMenu = new QMenu(this);
+    m_contextMenu = new QMenu(this);
 
-    deleteNoteAction = new QAction(tr("Delete Note"), this);
-    connect(deleteNoteAction, &QAction::triggered, this, [this] {
+    m_deleteNoteAction = new QAction(tr("Delete Note"), this);
+    connect(m_deleteNoteAction, &QAction::triggered, this, [this] {
         auto indexes = selectedIndexes();
         emit deleteNoteRequested(indexes);
     });
-    restoreNoteAction = new QAction(tr("Restore Note"), this);
-    connect(restoreNoteAction, &QAction::triggered, this, [this] {
+    m_restoreNoteAction = new QAction(tr("Restore Note"), this);
+    connect(m_restoreNoteAction, &QAction::triggered, this, [this] {
         auto indexes = selectedIndexes();
         emit restoreNoteRequested(indexes);
     });
-    pinNoteAction = new QAction(tr("Pin Note"), this);
-    connect(pinNoteAction, &QAction::triggered, this, [this] {
+    m_pinNoteAction = new QAction(tr("Pin Note"), this);
+    connect(m_pinNoteAction, &QAction::triggered, this, [this] {
         auto indexes = selectedIndexes();
         emit setPinnedNoteRequested(indexes, true);
     });
-    unpinNoteAction = new QAction(tr("Unpin Note"), this);
-    connect(unpinNoteAction, &QAction::triggered, this, [this] {
+    m_unpinNoteAction = new QAction(tr("Unpin Note"), this);
+    connect(m_unpinNoteAction, &QAction::triggered, this, [this] {
         auto indexes = selectedIndexes();
         emit setPinnedNoteRequested(indexes, false);
     });
 
-    newNoteAction = new QAction(tr("New Note"), this);
-    connect(newNoteAction, &QAction::triggered, this, [this] { emit newNoteRequested(); });
+    m_newNoteAction = new QAction(tr("New Note"), this);
+    connect(m_newNoteAction, &QAction::triggered, this, [this] { emit newNoteRequested(); });
 
     m_dragPixmap.load("qrc:/images/notepad.icns");
     setDragEnabled(true);
@@ -93,8 +93,8 @@ NoteListView::~NoteListView()
 
 void NoteListView::animateAddedRow(const QModelIndexList &indexes)
 {
-    NoteListDelegate *delegate = dynamic_cast<NoteListDelegate *>(itemDelegate());
-    if (delegate)
+    auto *delegate = static_cast<NoteListDelegate *>(itemDelegate());
+    if (delegate != nullptr)
         delegate->setState(NoteListState::Insert, indexes);
 }
 
@@ -124,7 +124,7 @@ void NoteListView::setCurrentIndexC(const QModelIndex &index)
     selectionModel()->setCurrentIndex(index, QItemSelectionModel::SelectCurrent);
 }
 
-QModelIndexList NoteListView::selectedIndex() const
+QModelIndexList NoteListView::getSelectedIndex() const
 {
     return selectedIndexes();
 }
@@ -132,11 +132,11 @@ QModelIndexList NoteListView::selectedIndex() const
 void NoteListView::onRemoveRowRequested(const QModelIndexList &indexes)
 {
     if (!indexes.isEmpty()) {
-        for (const auto index : qAsConst(indexes)) {
+        for (const auto index : std::as_const(indexes)) {
             m_needRemovedNotes.push_back(index.data(NoteListModel::NoteID).toInt());
         }
-        NoteListDelegate *delegate = dynamic_cast<NoteListDelegate *>(itemDelegate());
-        if (delegate) {
+        auto *delegate = static_cast<NoteListDelegate *>(itemDelegate());
+        if (delegate != nullptr) {
             if (m_animationEnabled) {
                 delegate->setState(NoteListState::Remove, indexes);
             } else {
@@ -164,7 +164,7 @@ void NoteListView::setCurrentFolderId(int newCurrentFolderId)
 void NoteListView::openPersistentEditorC(const QModelIndex &index)
 {
     if (index.isValid()) {
-        auto isHaveTag = dynamic_cast<NoteListModel *>(model())->noteIsHaveTag(index);
+        auto isHaveTag = static_cast<NoteListModel *>(model())->noteIsHaveTag(index);
         if (isHaveTag) {
             auto id = index.data(NoteListModel::NoteID).toInt();
             m_openedEditor[id] = {};
@@ -201,7 +201,7 @@ void NoteListView::unsetEditorWidget(int noteId, QWidget *w)
 void NoteListView::closeAllEditor()
 {
     for (const auto &id : m_openedEditor.keys()) {
-        auto index = dynamic_cast<NoteListModel *>(model())->getNoteIndex(id);
+        auto index = static_cast<NoteListModel *>(model())->getNoteIndex(id);
         closePersistentEditor(index);
     }
     m_openedEditor.clear();
@@ -224,8 +224,8 @@ void NoteListView::setTagPool(TagPool *newTagPool)
 
 void NoteListView::rowsAboutToBeMoved(const QModelIndexList &source)
 {
-    NoteListDelegate *delegate = dynamic_cast<NoteListDelegate *>(itemDelegate());
-    if (delegate) {
+    auto *delegate = static_cast<NoteListDelegate *>(itemDelegate());
+    if (delegate != nullptr) {
         if (m_animationEnabled) {
             delegate->setState(NoteListState::MoveOut, source);
         } else {
@@ -236,8 +236,8 @@ void NoteListView::rowsAboutToBeMoved(const QModelIndexList &source)
 
 void NoteListView::rowsMoved(const QModelIndexList &dest)
 {
-    NoteListDelegate *delegate = dynamic_cast<NoteListDelegate *>(itemDelegate());
-    if (delegate) {
+    auto *delegate = static_cast<NoteListDelegate *>(itemDelegate());
+    if (delegate != nullptr) {
         if (m_animationEnabled) {
             delegate->setState(NoteListState::Insert, dest);
         } else {
@@ -271,9 +271,8 @@ void NoteListView::mouseMoveEvent(QMouseEvent *event)
         QListView::mouseMoveEvent(event);
         return;
     }
-    if (event->buttons() & Qt::LeftButton) {
-        if ((event->pos() - m_dragStartPosition).manhattanLength()
-            >= QApplication::startDragDistance()) {
+    if ((event->buttons() & Qt::LeftButton) != 0U) {
+        if ((event->position().toPoint() - m_dragStartPosition).manhattanLength() >= QApplication::startDragDistance()) {
             startDrag(Qt::MoveAction);
         }
     }
@@ -284,16 +283,16 @@ void NoteListView::mousePressEvent(QMouseEvent *e)
 {
     Q_D(NoteListView);
     m_isMousePressed = true;
-    auto index = indexAt(e->pos());
+    auto index = indexAt(e->position().toPoint());
     if (!index.isValid()) {
         emit noteListViewClicked();
         return;
     }
-    auto model = dynamic_cast<NoteListModel *>(this->model());
-    if (model && model->isFirstPinnedNote(index)) {
+    auto const *noteListModel = static_cast<NoteListModel *>(this->model());
+    if ((noteListModel != nullptr) && noteListModel->isFirstPinnedNote(index)) {
         auto rect = visualRect(index);
         auto iconRect = QRect(rect.right() - 25, rect.y() + 2, 20, 20);
-        if (iconRect.contains(e->pos())) {
+        if (iconRect.contains(e->position().toPoint())) {
             setIsPinnedNotesCollapsed(!isPinnedNotesCollapsed());
             m_mousePressHandled = true;
             return;
@@ -301,7 +300,7 @@ void NoteListView::mousePressEvent(QMouseEvent *e)
     }
 
     if (e->button() == Qt::LeftButton) {
-        m_dragStartPosition = e->pos();
+        m_dragStartPosition = e->position().toPoint();
         auto oldIndexes = selectionModel()->selectedIndexes();
         if (!oldIndexes.contains(index)) {
             if (e->modifiers() == Qt::ControlModifier) {
@@ -324,13 +323,13 @@ void NoteListView::mousePressEvent(QMouseEvent *e)
         }
     }
     QPoint offset = d->offset();
-    d->pressedPosition = e->pos() + offset;
+    d->pressedPosition = e->position().toPoint() + offset;
 }
 
 void NoteListView::mouseReleaseEvent(QMouseEvent *e)
 {
     m_isMousePressed = false;
-    auto index = indexAt(e->pos());
+    auto index = indexAt(e->position().toPoint());
     if (!index.isValid()) {
         return;
     }
@@ -357,15 +356,15 @@ void NoteListView::mouseReleaseEvent(QMouseEvent *e)
 
 bool NoteListView::viewportEvent(QEvent *e)
 {
-    if (model()) {
+    if (model() != nullptr) {
         switch (e->type()) {
         case QEvent::Leave: {
             QPoint pt = mapFromGlobal(QCursor::pos());
             QModelIndex index = indexAt(QPoint(10, pt.y()));
             if (index.row() > 0) {
                 index = model()->index(index.row() - 1, 0);
-                NoteListDelegate *delegate = dynamic_cast<NoteListDelegate *>(itemDelegate());
-                if (delegate) {
+                auto *delegate = static_cast<NoteListDelegate *>(itemDelegate());
+                if (delegate != nullptr) {
                     delegate->setHoveredIndex(QModelIndex());
                     viewport()->update(visualRect(index));
                 }
@@ -392,7 +391,7 @@ void NoteListView::dragEnterEvent(QDragEnterEvent *event)
 void NoteListView::dragMoveEvent(QDragMoveEvent *event)
 {
     if (event->mimeData()->hasFormat(NOTE_MIME)) {
-        auto index = indexAt(event->pos());
+        auto index = indexAt(event->position().toPoint());
         auto isPinned = index.data(NoteListModel::NoteIsPinned).toBool();
         if (!index.isValid()) {
             event->ignore();
@@ -407,20 +406,19 @@ void NoteListView::dragMoveEvent(QDragMoveEvent *event)
         setDropIndicatorShown(true);
         QListView::dragMoveEvent(event);
         return;
-    } else {
-        event->ignore();
     }
+    event->ignore();
 }
 
 void NoteListView::scrollContentsBy(int dx, int dy)
 {
     QListView::scrollContentsBy(dx, dy);
-    auto m_listModel = dynamic_cast<NoteListModel *>(model());
-    if (!m_listModel) {
+    auto *listModel = static_cast<NoteListModel *>(model());
+    if (listModel == nullptr) {
         return;
     }
-    for (int i = 0; i < m_listModel->rowCount(); ++i) {
-        auto index = m_listModel->index(i, 0);
+    for (int i = 0; i < listModel->rowCount(); ++i) {
+        auto index = listModel->index(i, 0);
         if (index.isValid()) {
             auto id = index.data(NoteListModel::NoteID).toInt();
             if (m_openedEditor.contains(id)) {
@@ -435,7 +433,8 @@ void NoteListView::scrollContentsBy(int dx, int dy)
                 auto range = abs(viewport()->height());
                 if (y < -range) {
                     continue;
-                } else if (y > 2 * range) {
+                }
+                if (y > 2 * range) {
                     break;
                 }
                 openPersistentEditorC(index);
@@ -450,7 +449,7 @@ void NoteListView::startDrag(Qt::DropActions supportedActions)
     Q_D(NoteListView);
     auto indexes = selectedIndexes();
     QMimeData *mimeData = d->model->mimeData(indexes);
-    if (!mimeData) {
+    if (mimeData == nullptr) {
         return;
     }
     QRect rect;
@@ -465,15 +464,14 @@ void NoteListView::startDrag(Qt::DropActions supportedActions)
             if (!wl.empty()) {
                 pixmap = wl.first()->grab();
             } else {
-                qDebug() << __FUNCTION__ << "Dragging row" << current.row()
-                         << "is in opened editor list but editor widget is null";
+                qDebug() << __FUNCTION__ << "Dragging row" << current.row() << "is in opened editor list but editor widget is null";
             }
         } else {
             pixmap = d->renderToPixmap(indexes, &rect);
         }
-        auto model = dynamic_cast<NoteListModel *>(this->model());
-        if (model && model->hasPinnedNote()
-            && (model->isFirstPinnedNote(current) || model->isFirstUnpinnedNote(current))) {
+        auto const *noteListModel = static_cast<NoteListModel *>(this->model());
+        if ((noteListModel != nullptr) && noteListModel->hasPinnedNote()
+            && (noteListModel->isFirstPinnedNote(current) || noteListModel->isFirstUnpinnedNote(current))) {
             QRect r(0, 25, rect.width(), rect.height() - 25);
             pixmap = pixmap.copy(r);
             rect.setHeight(rect.height() - 25);
@@ -481,21 +479,16 @@ void NoteListView::startDrag(Qt::DropActions supportedActions)
         rect.adjust(horizontalOffset(), verticalOffset(), 0, 0);
     } else {
         pixmap.load(":/images/notepad.ico");
-        pixmap = pixmap.scaled(pixmap.width() / 4, pixmap.height() / 4, Qt::KeepAspectRatio,
-                               Qt::SmoothTransformation);
+        pixmap = pixmap.scaled(pixmap.width() / 4, pixmap.height() / 4, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 #ifdef __APPLE__
-        QFont m_displayFont(QFont(QStringLiteral("SF Pro Text")).exactMatch()
-                                    ? QStringLiteral("SF Pro Text")
-                                    : QStringLiteral("Roboto"));
+        QFont displayFont(QFont(QStringLiteral("SF Pro Text")).exactMatch() ? QStringLiteral("SF Pro Text") : QStringLiteral("Roboto"));
 #elif _WIN32
-        QFont m_displayFont(QFont(QStringLiteral("Segoe UI")).exactMatch()
-                                    ? QStringLiteral("Segoe UI")
-                                    : QStringLiteral("Roboto"));
+        QFont displayFont(QFont(QStringLiteral("Segoe UI")).exactMatch() ? QStringLiteral("Segoe UI") : QStringLiteral("Roboto"));
 #else
-        QFont m_displayFont(QStringLiteral("Roboto"));
+        QFont displayFont(QStringLiteral("Roboto"));
 #endif
-        m_displayFont.setPixelSize(16);
-        QFontMetrics fmContent(m_displayFont);
+        displayFont.setPixelSize(16);
+        QFontMetrics fmContent(displayFont);
         QString sz = QString::number(indexes.size());
         QRect szRect = fmContent.boundingRect(sz);
         QPixmap px(pixmap.width() + szRect.width(), pixmap.height());
@@ -505,20 +498,16 @@ void NoteListView::startDrag(Qt::DropActions supportedActions)
         QPainter painter(&px);
         painter.setPen(Qt::red);
         painter.drawPixmap(0, 0, pixmap);
-        painter.setFont(m_displayFont);
+        painter.setFont(displayFont);
         painter.drawText(nameRect, Qt::AlignRight | Qt::AlignBottom, sz);
         painter.end();
         std::swap(pixmap, px);
         rect = px.rect();
     }
     m_isDraggingPinnedNotes = false;
-    for (const auto &index : qAsConst(indexes)) {
-        if (index.data(NoteListModel::NoteIsPinned).toBool()) {
-            m_isDraggingPinnedNotes = true;
-            break;
-        }
-    }
-    QDrag *drag = new QDrag(this);
+    m_isDraggingPinnedNotes =
+            std::any_of(indexes.cbegin(), indexes.cend(), [](const QModelIndex &index) { return index.data(NoteListModel::NoteIsPinned).toBool(); });
+    auto *drag = new QDrag(this);
     drag->setPixmap(pixmap);
     drag->setMimeData(mimeData);
     if (indexes.size() == 1) {
@@ -534,16 +523,14 @@ void NoteListView::startDrag(Qt::DropActions supportedActions)
         drag->deleteLater();
         mimeData->deleteLater();
     }
-#if QT_VERSION > QT_VERSION_CHECK(5, 15, 0)
     d->dropEventMoved = false;
-#endif
     m_isDragging = false;
     // Reset the drop indicator
     d->dropIndicatorRect = QRect();
     d->dropIndicatorPosition = OnItem;
     closeAllEditor();
-    for (const auto &id : qAsConst(openedEditors)) {
-        auto index = dynamic_cast<NoteListModel *>(model())->getNoteIndex(id);
+    for (const auto &id : std::as_const(openedEditors)) {
+        auto index = static_cast<NoteListModel *>(model())->getNoteIndex(id);
         openPersistentEditorC(index);
     }
     scrollContentsBy(0, 0);
@@ -551,8 +538,8 @@ void NoteListView::startDrag(Qt::DropActions supportedActions)
 
 void NoteListView::setCurrentRowActive(bool isActive)
 {
-    NoteListDelegate *delegate = dynamic_cast<NoteListDelegate *>(itemDelegate());
-    if (!delegate)
+    auto *delegate = static_cast<NoteListDelegate *>(itemDelegate());
+    if (delegate == nullptr)
         return;
 
     delegate->setActive(isActive);
@@ -568,22 +555,21 @@ void NoteListView::setupSignalsSlots()
 {
     // remove/add separator
     // current selectected row changed
-    connect(selectionModel(), &QItemSelectionModel::currentRowChanged, this,
-            [this](const QModelIndex &current, const QModelIndex &previous) {
-                if (model()) {
-                    if (current.row() < previous.row()) {
-                        if (current.row() > 0) {
-                            QModelIndex prevIndex = model()->index(current.row() - 1, 0);
-                            viewport()->update(visualRect(prevIndex));
-                        }
-                    }
-
-                    if (current.row() > 1) {
-                        QModelIndex prevPrevIndex = model()->index(current.row() - 2, 0);
-                        viewport()->update(visualRect(prevPrevIndex));
-                    }
+    connect(selectionModel(), &QItemSelectionModel::currentRowChanged, this, [this](const QModelIndex &current, const QModelIndex &previous) {
+        if (model()) {
+            if (current.row() < previous.row()) {
+                if (current.row() > 0) {
+                    QModelIndex prevIndex = model()->index(current.row() - 1, 0);
+                    viewport()->update(visualRect(prevIndex));
                 }
-            });
+            }
+
+            if (current.row() > 1) {
+                QModelIndex prevPrevIndex = model()->index(current.row() - 2, 0);
+                viewport()->update(visualRect(prevPrevIndex));
+            }
+        }
+    });
 
     // row was entered
     connect(this, &NoteListView::entered, this, [this](const QModelIndex &index) {
@@ -600,7 +586,7 @@ void NoteListView::setupSignalsSlots()
                 viewport()->update(visualRect(prevIndex));
             }
 
-            NoteListDelegate *delegate = dynamic_cast<NoteListDelegate *>(itemDelegate());
+            auto *delegate = static_cast<NoteListDelegate *>(itemDelegate());
             if (delegate)
                 delegate->setHoveredIndex(index);
         }
@@ -609,7 +595,7 @@ void NoteListView::setupSignalsSlots()
     // viewport was entered
     connect(this, &NoteListView::viewportEntered, this, [this]() {
         if (model() && model()->rowCount() > 1) {
-            NoteListDelegate *delegate = dynamic_cast<NoteListDelegate *>(itemDelegate());
+            auto *delegate = static_cast<NoteListDelegate *>(itemDelegate());
             if (delegate)
                 delegate->setHoveredIndex(QModelIndex());
 
@@ -622,7 +608,7 @@ void NoteListView::setupSignalsSlots()
     connect(verticalScrollBar(), &QScrollBar::rangeChanged, this, [this](int min, int max) {
         Q_UNUSED(min)
 
-        NoteListDelegate *delegate = dynamic_cast<NoteListDelegate *>(itemDelegate());
+        auto *delegate = static_cast<NoteListDelegate *>(itemDelegate());
         if (delegate) {
             if (max > 0) {
                 delegate->setRowRightOffset(2);
@@ -644,12 +630,12 @@ void NoteListView::setupStyleSheet()
     setStyleSheet(file.readAll());
 }
 
-void NoteListView::addNotesToTag(QSet<int> notesId, int tagId)
+void NoteListView::addNotesToTag(QSet<int> const &notesId, int tagId)
 {
-    for (const auto &id : qAsConst(notesId)) {
-        auto model = dynamic_cast<NoteListModel *>(this->model());
-        if (model) {
-            auto index = model->getNoteIndex(id);
+    for (const auto &id : std::as_const(notesId)) {
+        auto const *noteListModel = static_cast<NoteListModel *>(this->model());
+        if (noteListModel != nullptr) {
+            auto index = noteListModel->getNoteIndex(id);
             if (index.isValid()) {
                 emit addTagRequested(index, tagId);
             }
@@ -657,12 +643,12 @@ void NoteListView::addNotesToTag(QSet<int> notesId, int tagId)
     }
 }
 
-void NoteListView::removeNotesFromTag(QSet<int> notesId, int tagId)
+void NoteListView::removeNotesFromTag(QSet<int> const &notesId, int tagId)
 {
-    for (const auto &id : qAsConst(notesId)) {
-        auto model = dynamic_cast<NoteListModel *>(this->model());
-        if (model) {
-            auto index = model->getNoteIndex(id);
+    for (const auto &id : std::as_const(notesId)) {
+        auto const *noteListModel = static_cast<NoteListModel *>(this->model());
+        if (noteListModel != nullptr) {
+            auto index = noteListModel->getNoteIndex(id);
             if (index.isValid()) {
                 emit removeTagRequested(index, tagId);
             }
@@ -670,8 +656,7 @@ void NoteListView::removeNotesFromTag(QSet<int> notesId, int tagId)
     }
 }
 
-void NoteListView::selectionChanged(const QItemSelection &selected,
-                                    const QItemSelection &deselected)
+void NoteListView::selectionChanged(const QItemSelection &selected, const QItemSelection &deselected)
 {
     QListView::selectionChanged(selected, deselected);
     QSet<int> ids;
@@ -699,13 +684,13 @@ void NoteListView::onCustomContextMenu(QPoint point)
             indexList = selectionModel()->selectedIndexes();
         }
         QSet<int> notes;
-        for (const auto &idx : qAsConst(indexList)) {
+        for (const auto &idx : std::as_const(indexList)) {
             notes.insert(idx.data(NoteListModel::NoteID).toInt());
         }
-        contextMenu->clear();
-        if (m_tagPool) {
-            m_tagsMenu = contextMenu->addMenu("Tags ...");
-            for (auto action : qAsConst(m_noteTagActions)) {
+        m_contextMenu->clear();
+        if (m_tagPool != nullptr) {
+            m_tagsMenu = m_contextMenu->addMenu("Tags ...");
+            for (auto *action : std::as_const(m_noteTagActions)) {
                 delete action;
             }
             m_noteTagActions.clear();
@@ -721,8 +706,7 @@ void NoteListView::onCustomContextMenu(QPoint point)
 #else
                 int iconPointSizeOffset = -4;
 #endif
-                painter.setFont(FontLoader::getInstance().loadFont("Font Awesome 6 Free Solid", "",
-                                                                   24 + iconPointSizeOffset));
+                painter.setFont(font_loader::loadFont("Font Awesome 6 Free Solid", "", 24 + iconPointSizeOffset));
                 painter.drawText(iconRect, u8"\uf111"); // fa-circle
                 return QIcon{ pix };
             };
@@ -730,7 +714,7 @@ void NoteListView::onCustomContextMenu(QPoint point)
             const auto tagIds = m_tagPool->tagIds();
             for (const auto &id : tagIds) {
                 bool all = true;
-                for (const auto &selectedIndex : qAsConst(indexList)) {
+                for (const auto &selectedIndex : std::as_const(indexList)) {
                     auto tags = selectedIndex.data(NoteListModel::NoteTagsList).value<QSet<int>>();
                     if (!tags.contains(id)) {
                         all = false;
@@ -741,11 +725,10 @@ void NoteListView::onCustomContextMenu(QPoint point)
                     tagInNote.insert(id);
                 }
             }
-            for (auto id : qAsConst(tagInNote)) {
+            for (auto id : std::as_const(tagInNote)) {
                 auto tag = m_tagPool->getTag(id);
-                auto tagAction = new QAction(QString("✓ Remove tag ") + tag.name(), this);
-                connect(tagAction, &QAction::triggered, this,
-                        [this, id, notes] { removeNotesFromTag(notes, id); });
+                auto *tagAction = new QAction(QStringLiteral("✓ Remove tag %1").arg(tag.name()), this);
+                connect(tagAction, &QAction::triggered, this, [this, id, notes] { removeNotesFromTag(notes, id); });
                 tagAction->setIcon(createTagIcon(tag.color()));
                 m_tagsMenu->addAction(tagAction);
                 m_noteTagActions.append(tagAction);
@@ -756,9 +739,8 @@ void NoteListView::onCustomContextMenu(QPoint point)
                     continue;
                 }
                 auto tag = m_tagPool->getTag(id);
-                auto tagAction = new QAction(QString(" ") + tag.name(), this);
-                connect(tagAction, &QAction::triggered, this,
-                        [this, id, notes] { addNotesToTag(notes, id); });
+                auto *tagAction = new QAction(QStringLiteral(" %1").arg(tag.name()), this);
+                connect(tagAction, &QAction::triggered, this, [this, id, notes] { addNotesToTag(notes, id); });
                 tagAction->setIcon(createTagIcon(tag.color()));
                 m_tagsMenu->addAction(tagAction);
                 m_noteTagActions.append(tagAction);
@@ -766,109 +748,104 @@ void NoteListView::onCustomContextMenu(QPoint point)
         }
         if (m_isInTrash) {
             if (notes.size() > 1) {
-                restoreNoteAction->setText(tr("Restore Notes"));
+                m_restoreNoteAction->setText(tr("Restore Notes"));
             } else {
-                restoreNoteAction->setText(tr("Restore Note"));
+                m_restoreNoteAction->setText(tr("Restore Note"));
             }
-            contextMenu->addAction(restoreNoteAction);
+            m_contextMenu->addAction(m_restoreNoteAction);
         }
         if (notes.size() > 1) {
-            deleteNoteAction->setText(tr("Delete Notes"));
+            m_deleteNoteAction->setText(tr("Delete Notes"));
         } else {
-            deleteNoteAction->setText(tr("Delete Note"));
+            m_deleteNoteAction->setText(tr("Delete Note"));
         }
-        contextMenu->addAction(deleteNoteAction);
-        if ((!m_listViewInfo.isInTag)
-            && (m_listViewInfo.parentFolderId != SpecialNodeID::TrashFolder)) {
-            contextMenu->addSeparator();
+        m_contextMenu->addAction(m_deleteNoteAction);
+        if ((!m_listViewInfo.isInTag) && (m_listViewInfo.parentFolderId != TRASH_FOLDER_ID)) {
+            m_contextMenu->addSeparator();
             if (notes.size() > 1) {
-                pinNoteAction->setText(tr("Pin Notes"));
-                unpinNoteAction->setText(tr("Unpin Notes"));
-                enum class ShowAction { NotInit, ShowPin, ShowBoth, ShowUnpin };
+                m_pinNoteAction->setText(tr("Pin Notes"));
+                m_unpinNoteAction->setText(tr("Unpin Notes"));
                 ShowAction a = ShowAction::NotInit;
-                for (const auto &idx : qAsConst(indexList)) {
+                for (const auto &idx : std::as_const(indexList)) {
                     if (idx.data(NoteListModel::NoteIsPinned).toBool()) {
                         if (a == ShowAction::ShowPin) {
                             a = ShowAction::ShowBoth;
                             break;
-                        } else {
-                            a = ShowAction::ShowUnpin;
                         }
+                        a = ShowAction::ShowUnpin;
+
                     } else {
                         if (a == ShowAction::ShowUnpin) {
                             a = ShowAction::ShowBoth;
                             break;
-                        } else {
-                            a = ShowAction::ShowPin;
                         }
+                        a = ShowAction::ShowPin;
                     }
                 }
                 switch (a) {
                 case ShowAction::ShowPin:
-                    contextMenu->addAction(pinNoteAction);
+                    m_contextMenu->addAction(m_pinNoteAction);
                     break;
                 case ShowAction::ShowUnpin:
-                    contextMenu->addAction(unpinNoteAction);
+                    m_contextMenu->addAction(m_unpinNoteAction);
                     break;
                 default:
-                    contextMenu->addAction(pinNoteAction);
-                    contextMenu->addAction(unpinNoteAction);
+                    m_contextMenu->addAction(m_pinNoteAction);
+                    m_contextMenu->addAction(m_unpinNoteAction);
                 }
             } else {
-                pinNoteAction->setText(tr("Pin Note"));
-                unpinNoteAction->setText(tr("Unpin Note"));
+                m_pinNoteAction->setText(tr("Pin Note"));
+                m_unpinNoteAction->setText(tr("Unpin Note"));
                 auto isPinned = index.data(NoteListModel::NoteIsPinned).toBool();
                 if (!isPinned) {
-                    contextMenu->addAction(pinNoteAction);
+                    m_contextMenu->addAction(m_pinNoteAction);
                 } else {
-                    contextMenu->addAction(unpinNoteAction);
+                    m_contextMenu->addAction(m_unpinNoteAction);
                 }
             }
         }
-        contextMenu->addSeparator();
-        if (m_dbManager) {
-            for (auto action : qAsConst(m_folderActions)) {
+        m_contextMenu->addSeparator();
+        if (m_dbManager != nullptr) {
+            for (auto *action : std::as_const(m_folderActions)) {
                 delete action;
             }
             m_folderActions.clear();
-            auto m = contextMenu->addMenu("Move to");
+            auto *m = m_contextMenu->addMenu("Move to");
             FolderListType folders;
-            QMetaObject::invokeMethod(m_dbManager, "getFolderList", Qt::BlockingQueuedConnection,
-                                      Q_RETURN_ARG(FolderListType, folders));
+            QMetaObject::invokeMethod(m_dbManager, "getFolderList", Qt::BlockingQueuedConnection, Q_RETURN_ARG(FolderListType, folders));
             for (const auto &id : folders.keys()) {
                 if (id == m_currentFolderId) {
                     continue;
                 }
-                auto action = new QAction(folders[id], this);
+                auto *action = new QAction(folders[id], this);
                 connect(action, &QAction::triggered, this, [this, id] {
                     auto indexes = selectedIndexes();
-                    for (const auto &selectedIndex : qAsConst(indexes)) {
+                    for (const auto &selectedIndex : std::as_const(indexes)) {
                         if (selectedIndex.isValid()) {
-                            emit moveNoteRequested(
-                                    selectedIndex.data(NoteListModel::NoteID).toInt(), id);
+                            emit moveNoteRequested(selectedIndex.data(NoteListModel::NoteID).toInt(), id);
                         }
                     }
                 });
                 m->addAction(action);
                 m_folderActions.append(action);
             }
-            contextMenu->addSeparator();
+            m_contextMenu->addSeparator();
         }
         if (!m_isInTrash) {
-            contextMenu->addAction(newNoteAction);
+            m_contextMenu->addAction(m_newNoteAction);
         }
-        contextMenu->exec(viewport()->mapToGlobal(point));
+        m_contextMenu->exec(viewport()->mapToGlobal(point));
     }
 }
 
 void NoteListView::onAnimationFinished(NoteListState state)
 {
     if (state == NoteListState::Remove) {
-        auto model = dynamic_cast<NoteListModel *>(this->model());
-        if (model) {
-            for (const auto id : qAsConst(m_needRemovedNotes)) {
-                auto index = model->getNoteIndex(id);
-                model->removeRow(index.row());
+        auto *noteListModel = static_cast<NoteListModel *>(this->model());
+        if (noteListModel != nullptr) {
+            for (const auto id : std::as_const(m_needRemovedNotes)) {
+                auto index = noteListModel->getNoteIndex(id);
+                noteListModel->removeRow(index.row());
             }
             m_needRemovedNotes.clear();
         }
@@ -880,20 +857,9 @@ QPixmap NoteListViewPrivate::renderToPixmap(const QModelIndexList &indexes, QRec
     Q_ASSERT(r);
     QItemViewPaintPairs paintPairs = draggablePaintPairs(indexes, r);
     if (paintPairs.isEmpty())
-        return QPixmap();
-#if QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
-    qreal scale = 1.0f;
-    Q_Q(const QAbstractItemView);
-    QWidget *window = q->window();
-    if (window) {
-        QWindow *windowHandle = window->windowHandle();
-        if (windowHandle)
-            scale = windowHandle->devicePixelRatio();
-    }
-#else
+        return {};
     QWindow *window = windowHandle(WindowHandleMode::Closest);
-    const qreal scale = window ? window->devicePixelRatio() : qreal(1);
-#endif
+    const qreal scale = (window != nullptr) ? window->devicePixelRatio() : qreal(1);
 
     QPixmap pixmap(r->size() * scale);
     pixmap.setDevicePixelRatio(scale);
@@ -905,13 +871,9 @@ QPixmap NoteListViewPrivate::renderToPixmap(const QModelIndexList &indexes, QRec
     for (int j = 0; j < paintPairs.count(); ++j) {
         option.rect = paintPairs.at(j).rect.translated(-r->topLeft());
         const QModelIndex &current = paintPairs.at(j).index;
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
         Q_Q(const QAbstractItemView);
         adjustViewOptionsForIndex(&option, current);
         q->itemDelegateForIndex(current)->paint(&painter, option, current);
-#else
-        delegateForIndex(current)->paint(&painter, option, current);
-#endif
     }
     return pixmap;
 }
@@ -919,11 +881,7 @@ QPixmap NoteListViewPrivate::renderToPixmap(const QModelIndexList &indexes, QRec
 QStyleOptionViewItem NoteListViewPrivate::viewOptionsV1() const
 {
     Q_Q(const NoteListView);
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     QStyleOptionViewItem option;
     q->initViewItemOption(&option);
     return option;
-#else
-    return q->viewOptions();
-#endif
 }

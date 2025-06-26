@@ -1,18 +1,14 @@
 #include "nodepath.h"
 #include "nodedata.h"
 
-NodePath::NodePath(const QString &path) : m_path(path) { }
+NodePath::NodePath(QString path) : m_path(std::move(path)) { }
 
 QStringList NodePath::separate() const
 {
-#if QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
-    return m_path.split(PATH_SEPARATOR, QString::SkipEmptyParts);
-#else
     return m_path.split(PATH_SEPARATOR, Qt::SkipEmptyParts);
-#endif
 }
 
-QString NodePath::path() const
+QString const &NodePath::path() const
 {
     return m_path;
 }
@@ -21,16 +17,15 @@ NodePath NodePath::parentPath() const
 {
     auto s = separate();
     s.takeLast();
-    return s.join(PATH_SEPARATOR);
+    return { s.join(PATH_SEPARATOR) };
 }
 
 QString NodePath::getAllNoteFolderPath()
 {
-    return PATH_SEPARATOR + QString::number(SpecialNodeID::RootFolder);
+    return QStringLiteral("%1%2").arg(PATH_SEPARATOR).arg(ROOT_FOLDER_ID);
 }
 
 QString NodePath::getTrashFolderPath()
 {
-    return PATH_SEPARATOR + QString::number(SpecialNodeID::RootFolder) + PATH_SEPARATOR
-            + QString::number(SpecialNodeID::TrashFolder);
+    return QStringLiteral("%1%2%1%3").arg(PATH_SEPARATOR).arg(ROOT_FOLDER_ID).arg(TRASH_FOLDER_ID);
 }
